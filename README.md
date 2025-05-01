@@ -32,10 +32,9 @@ The implementation follows these key steps:
 ## Compilation
 
 ```bash
-# Adjust METIS_DIR in the Makefile if needed
-make
-```
+mpic++ parallel_butterfly.cpp -o filename -lmetis
 
+```
 ## Running the Program
 
 ```bash
@@ -83,3 +82,9 @@ For large datasets, the parallel implementation provides significant performance
 ## Testing with Multiple Datasets
 
 It's recommended to test the implementation with various datasets of different sizes and structures to evaluate performance characteristics.
+
+## Serial MPI
+![alt text](images/image.png)
+
+## Parallel MPI
+![alt text](images/image-1.png)
