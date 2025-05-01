@@ -388,12 +388,18 @@ long long count_butterflies(const unordered_map<pair<int, int>, int, PairHash> &
 {
     long long total_butterflies = 0;
     
+    // Convert to vector for OpenMP parallelization
+    vector<pair<pair<int, int>, int>> wedge_vector;
+    for (const auto &entry : wedge_counts) {
+        wedge_vector.push_back(entry);
+    }
+    
     #pragma omp parallel reduction(+:total_butterflies)
     {
-        #pragma omp for
-        for (auto it = wedge_counts.begin(); it != wedge_counts.end(); ++it)
+        #pragma omp for schedule(dynamic, 64)
+        for (size_t i = 0; i < wedge_vector.size(); ++i)
         {
-            int count = it->second;
+            int count = wedge_vector[i].second;
             if (count >= 2)
             {
                 long long butterflies = static_cast<long long>(count) * (count - 1) / 2;
@@ -442,6 +448,7 @@ void serialize_wedge_counts(const unordered_map<pair<int, int>, int, PairHash> &
     // Format: [count, key1.first, key1.second, value1, key2.first, key2.second, value2, ...]
     buffer.clear();
     buffer.push_back(wedge_counts.size());
+    buffer.reserve(wedge_counts.size() * 3 + 1); // Pre-allocate to avoid resizing
     
     for (const auto &entry : wedge_counts)
     {
@@ -449,6 +456,21 @@ void serialize_wedge_counts(const unordered_map<pair<int, int>, int, PairHash> &
         buffer.push_back(entry.first.second);
         buffer.push_back(entry.second);
     }
+}
+
+// Improved wedge merging to reduce communication volume
+unordered_map<pair<int, int>, int, PairHash> local_filter_wedges(
+    const unordered_map<pair<int, int>, int, PairHash> &wedge_counts, int min_count = 2)
+{
+    unordered_map<pair<int, int>, int, PairHash> filtered;
+    
+    for (const auto &entry : wedge_counts) {
+        if (entry.second >= min_count) {
+            filtered[entry.first] = entry.second;
+        }
+    }
+    
+    return filtered;
 }
 
 // Deserialize a buffer back to wedge counts
@@ -568,9 +590,24 @@ int main(int argc, char *argv[])
         cout << "Wedge counting time: " << wedge_end_time - wedge_start_time << " seconds" << endl;
     }
     
-    // Combine results from all processes
+    // Combine results from all processes with optimized communication
     unordered_map<pair<int, int>, int, PairHash> global_wedge_counts;
     double comm_start_time = MPI_Wtime();
+    
+    // Only output stats about potential filtering (don't actually filter yet)
+    if (rank == 0) {
+        int filtered_count = 0;
+        for (const auto &entry : local_wedge_counts) {
+            if (entry.second >= 2) filtered_count++;
+        }
+        
+        cout << "Wedge pairs that could form butterflies locally: " 
+             << filtered_count << "/" << local_wedge_counts.size() 
+             << " (" << (filtered_count * 100.0 / local_wedge_counts.size()) << "%)" << endl;
+    }
+    
+    // Use batch processing for large maps to reduce memory pressure
+    const int BATCH_SIZE = 100000; // Adjust based on available memory
     
     if (rank == 0) {
         // Root process incorporates its own wedge counts
@@ -591,20 +628,41 @@ int main(int argc, char *argv[])
             unordered_map<pair<int, int>, int, PairHash> received_counts = 
                 deserialize_wedge_counts(buffer);
             
-            // Use OpenMP for merging large count maps
-            #pragma omp parallel
-            {
-                unordered_map<pair<int, int>, int, PairHash> thread_local_merge;
+            if (received_counts.size() > BATCH_SIZE) {
+                // Process in batches to reduce memory pressure
+                vector<pair<pair<int, int>, int>> batch_entries;
+                batch_entries.reserve(BATCH_SIZE);
                 
-                #pragma omp for schedule(dynamic, 1000)
-                for (auto it = received_counts.begin(); it != received_counts.end(); ++it) {
-                    thread_local_merge[it->first] = it->second;
+                int entries_processed = 0;
+                for (const auto &entry : received_counts) {
+                    batch_entries.push_back(entry);
+                    entries_processed++;
+                    
+                    if (batch_entries.size() >= BATCH_SIZE || entries_processed == received_counts.size()) {
+                        // Process this batch
+                        #pragma omp parallel
+                        {
+                            unordered_map<pair<int, int>, int, PairHash> thread_local_merge;
+                            
+                            #pragma omp for schedule(dynamic, 1000)
+                            for (size_t j = 0; j < batch_entries.size(); ++j) {
+                                const auto &entry = batch_entries[j];
+                                thread_local_merge[entry.first] = entry.second;
+                            }
+                            
+                            #pragma omp critical
+                            {
+                                merge_wedge_counts(global_wedge_counts, thread_local_merge);
+                            }
+                        }
+                        
+                        // Clear for next batch
+                        batch_entries.clear();
+                    }
                 }
-                
-                #pragma omp critical
-                {
-                    merge_wedge_counts(global_wedge_counts, thread_local_merge);
-                }
+            } else {
+                // Small enough to process directly
+                merge_wedge_counts(global_wedge_counts, received_counts);
             }
         }
     } else {
