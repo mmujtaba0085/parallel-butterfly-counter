@@ -162,4 +162,4 @@ It's recommended to test the implementations with various datasets of different 
 ![alt text](images/image-1.png)
 
 ### Hybrid MPI+OpenMP Implementation
-![alt text](images/image-2.png)
+![alt text](images/image_mpi_bipartite_100k.png)
