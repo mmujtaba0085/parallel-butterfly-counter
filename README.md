@@ -7,6 +7,7 @@ This project implements parallel versions of the butterfly counting algorithm fo
 In bipartite graphs, a butterfly is a subgraph pattern consisting of four vertices (two from each partition) connected by four edges, forming a complete bipartite subgraph K₂,₂.
 
 # Parallel Algorithms
+
 ## MPI Implementation Details
 
 The MPI implementation follows these key steps:
@@ -86,6 +87,7 @@ mpirun -np 4 ./hybrid_butterfly path/to/your/dataset.graph
 ## Input File Format
 
 The input file should follow the format:
+
 ```
 AdjacencyGraph
 <num_left_vertices> <num_right_vertices>
@@ -94,6 +96,7 @@ AdjacencyGraph
 ```
 
 Or for weighted graphs:
+
 ```
 WeightedAdjacencyGraph
 <num_left_vertices> <num_right_vertices>
@@ -129,12 +132,14 @@ While the hybrid MPI+OpenMP approach theoretically offers better performance thr
 - **Thread Management Overhead**: Creating and managing OpenMP threads adds some computational cost
 
 The implementation includes several optimizations to mitigate these issues:
+
 - Batch processing to reduce memory pressure
 - Thread-local data structures to minimize contention
 - Pre-allocated communication buffers
 - Dynamic scheduling for better load balancing
 
 For optimal performance, the number of MPI processes and OpenMP threads should be carefully tuned based on:
+
 1. The specific hardware architecture
 2. The graph size and structure
 3. Available memory per node
@@ -154,12 +159,87 @@ For large datasets, the parallel implementations provide significant performance
 
 It's recommended to test the implementations with various datasets of different sizes and structures to evaluate performance characteristics.
 
+---
+
+# Performance Analysis Guide
+
+Note: use ssh -X mpi@main (to login, instead of su - mpi), this is to also get GUI analysis
+
+### TAU SETUP
+
+```bash
+sudo apt update
+sudo apt install build-essential gfortran g++ make cmake wget git libpapi-dev libotf-dev libelf-dev
+
+
+cd ~
+git clone https://github.com/UO-OACISS/tau2.git
+cd tau2
+./configure -mpi -openmp
+
+```
+
+### Build TAU
+
+```bash
+make -j$(nproc)
+```
+
+At this stage, we'll find tau_cxx.sh and paraprof inside tau2/x86_64/bin/
+
+### Add/Export ENVs
+
+this is for one time setup (permanent), otherwises you'll have to run these commands everytime, thus we'll make it easier by exporting and adding to bash profiles
+
+```bash
+export TAU_MAKEFILE=$HOME/tau2/x86_64/lib/Makefile.tau-mpi-openmp
+export PATH=$HOME/tau2/x86_64/bin:$PATH
+
+echo 'export TAU_MAKEFILE=$HOME/tau2/x86_64/lib/Makefile.tau-mpi-openmp' >> ~/.bashrc
+echo 'export TAU_MAKEFILE=$HOME/tau2/x86_64/lib/Makefile.tau-mpi-openmp' >> ~/.bash_profile
+echo 'export TAU_MAKEFILE=$HOME/tau2/x86_64/lib/Makefile.tau-mpi-openmp' >> ~/.profile
+echo 'export PATH=$HOME/tau2/x86_64/bin:$PATH' >> ~/.bashrc
+echo 'export PATH=$HOME/tau2/x86_64/bin:$PATH' >> ~/.bash_profile
+echo 'export PATH=$HOME/tau2/x86_64/bin:$PATH' >> ~/.profile
+
+source ~/.bashrc
+source ~/.bash_profile
+source ~/.profile
+```
+
+### Compile and Run Command (From Root)
+
+```bash
+tau_cxx.sh -openmp -O2 parallel-butterfly-counter/Parallel/MPI+OpenMP.cpp -o parallel-butterfly-counter/hybrid_butterfly -lmetis //compile
+
+mpiexec -n 4 -hosts master,slave ./parallel-butterfly-counter/hybrid_butterfly parallel-butterfly-counter/datasets/bipartite_graph_100k.txt
+
+```
+
+after running the program, profiles will be generated in the root folder (ls to check)
+just run the following command to view these
+
+```bash
+pprof
+paraprof
+```
+
+### pprof -> text/tabular_analysis
+
+### paraprof -> gui based
+
+---
+
 ## Performance Comparison
+
 ### Serial Implementation
+
 ![alt text](images/image.png)
 
 ### MPI Implementation
+
 ![alt text](images/image-1.png)
 
 ### Hybrid MPI+OpenMP Implementation
+
 ![alt text](images/image_mpi_bipartite_100k.png)
