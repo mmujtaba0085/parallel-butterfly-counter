@@ -74,30 +74,37 @@ paraprof
 ```bash
 #!/bin/bash
 
+# Check if a dataset filename was provided
+if [ -z "$1" ]; then
+    echo "Usage: $0 DATA_FILENAME"
+    exit 1
+fi
+
 # Define directories and filenames
 SOURCE_FILE="parallel-butterfly-counter/Parallel/MPI+OpenMP.cpp"
 OUTPUT_BINARY="parallel-butterfly-counter/hybrid_butterfly"
-DATA_FILE="datasets/bipartite_graph_100k.txt"
+DATA_FILE="parallel-butterfly-counter/datasets/$1"
 
-# compile the code with TAU
+# Compile the code with TAU
 echo "Compiling code with TAU..."
-tau_cxx.sh -openmp -O2 $SOURCE_FILE -o $OUTPUT_BINARY -lmetis
+tau_cxx.sh -openmp -O2 "$SOURCE_FILE" -o "$OUTPUT_BINARY" -lmetis
 
-# run the program using MPI
+# Run the program using MPI
 echo "Running the program using MPI..."
-mpiexec -n 4 -hosts master,slave ./$OUTPUT_BINARY $DATA_FILE
+mpiexec -n 4 -hosts master,slave ./"$OUTPUT_BINARY" "$DATA_FILE"
 
-# performance analysis with pprof
-echo "Showing performance analysis..."
+# Performance analysis with pprof
+echo "Showing performance analysis with pprof..."
 pprof
 
-# performance analysis with paraprof
-echo "Showing performance analysis..."
+# Performance analysis with paraprof
+echo "Showing performance analysis with paraprof..."
 paraprof
 
 # Uncomment the line below if you want to filter for MPI overhead
 # pprof -s | grep MPI
 
 echo "Performance analysis complete."
+
 
 ```
