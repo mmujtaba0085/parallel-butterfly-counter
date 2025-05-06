@@ -108,3 +108,27 @@ echo "Performance analysis complete."
 
 
 ```
+To run:
+```
+./analyze.sh Dataset
+```
+
+### Bipartite Graph 50k
+
+![alt text](images/bipartite_graph_50k.jpg)
+
+### Bipartite Graph 100k
+
+![alt text](images/bipartite_graph_100k.jpg)
+
+### DS-1
+
+![alt text](images/ds-1.txt.jpg)
+
+### DS-2
+
+![alt text](images/ds-2.txt.jpg)
+
+### Huge Bipartite Graph
+
+![alt text](images/huge_bipartite_graph.txt.jpg)
