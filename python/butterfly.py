@@ -95,7 +95,7 @@ def _rank_vertices(G, nodes):
     """
     return sorted(nodes, key=lambda v: (G.degree(v), v))
 
-
+@nx._dispatchable
 def butterfly_count(G, nodes=None):
     """Count the total number of butterflies (K_{2,2} subgraphs) in *G*.
 
@@ -178,7 +178,7 @@ def butterfly_count(G, nodes=None):
 
     return total
 
-
+@nx._dispatchable
 def butterfly_count_per_vertex(G, nodes=None):
     """Count how many butterflies each vertex *participates in*.
 
