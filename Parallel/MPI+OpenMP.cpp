@@ -486,7 +486,7 @@ unordered_map<pair<int, int>, int, PairHash> deserialize_wedge_counts(const vect
         int v = buffer[idx + 1];
         int count = buffer[idx + 2];
         
-        wedge_counts[{u, v}] = count;
+        wedge_counts[{u, v}] += count;
     }
     
     return wedge_counts;
